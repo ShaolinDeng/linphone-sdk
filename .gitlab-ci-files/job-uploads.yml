@@ -336,6 +336,7 @@ job-xamarin-upload:
 
     - PARENT_BRANCH=$(echo $(git log --pretty=oneline  --pretty=format:%D -n 1 HEAD~1 | awk -F ", " '{print $1}' | awk -F "origin/" '{print $2}'))
     - cd results
+    - echo PIPELINE_TRIGGERED_BY=$GITLAB_USER_NAME | tee -a environment.properties
     - echo BRANCH=$BRANCH | tee -a environment.properties
     - echo SDK_VERSION=$SDK_VERSION | tee -a environment.properties
     - echo BCTOOLBOX_VERSION=$BCTOOLBOX_VERSION | tee -a environment.properties
@@ -408,6 +409,10 @@ job-xamarin-upload:
     #we move the BCUnit report and environment.properties to the desired folder to prepare allure report generation
     - echo "mv ../../../../environment.properties . && mv ../../../../$XML_FILENAME_START_PATTERN* ." | tee -a allure_launch_script
 
+    #symlink with username to ease searching
+    - echo "mkdir -p ../../../$GITLAB_USER_LOGIN/$SDK_VERSION/$PLATFORM" | tee -a allure_launch_script
+    - echo "ln -s \$(pwd) ../../../$GITLAB_USER_LOGIN/$SDK_VERSION/$PLATFORM/$TESTER" | tee -a allure_launch_script
+
     #we use the uploaded version of allure on parent directory because the allure version in repos is too old (TO DO auto install new version properly)
     - echo "~/allure-2.10.0/bin/allure generate --clean ." | tee -a allure_launch_script
     - cat allure_launch_script
@@ -449,31 +454,40 @@ job-xamarin-upload:
     #     "matchedStatuses": ["broken"]
     #  }
     #]
+    - echo "https://linphone.org/snapshots/allure-tests-reports/$ESCAPED_BRANCH/$GITLAB_USER_LOGIN/$SDK_VERSION/$PLATFORM/$TESTER/allure-report" | tee report_url
+    - pwd
+    - ls -lah
+    - ls -lah ${CI_PROJECT_DIR}
+
+  artifacts:
+    paths:
+      - ${CI_PROJECT_DIR}/results/report_url
+    expire_in: 4 week
 
 .job-test-report-upload-linux-scheduled:
   extends: .job-test-report-upload
   only:
     variables:
       - $ENABLE_LINUX_TESTS
-      
+
 .job-test-report-upload-windows-scheduled:
   extends: .job-test-report-upload
   only:
     variables:
       - $ENABLE_WINDOWS_TESTS
-      
+
 .job-test-report-upload-macos-scheduled:
   extends: .job-test-report-upload
   only:
     variables:
       - $ENABLE_MACOSX_TESTS
-      
+
 .job-test-report-upload-ios-scheduled:
   extends: .job-test-report-upload
   only:
     variables:
       - $ENABLE_IOS_TESTS
-      
+
 .job-test-report-upload-android-scheduled:
   extends: .job-test-report-upload
   only:
@@ -486,7 +500,7 @@ job-test-upload-libl-centos7-mr:
     - test-liblinphone-centos7-mr
   variables:
     PLATFORM: "linux-centos7"
-    TESTER: "liblinphone"  
+    TESTER: "liblinphone"
   only:
     refs:
       - branches
@@ -495,7 +509,7 @@ job-test-upload-libl-centos7-mr:
       - $ENABLE_TESTS_IN_MR
   except:
     - schedules
-    
+
 job-test-upload-libl-centos7-schedule:
   extends: .job-test-report-upload-linux-scheduled
   dependencies:
@@ -503,14 +517,14 @@ job-test-upload-libl-centos7-schedule:
   variables:
     PLATFORM: "linux-centos7"
     TESTER: "liblinphone"
-    
+
 job-test-upload-libl-centos7-forced:
   extends: .job-test-report-upload
   dependencies:
     - test-liblinphone-centos7-force
   variables:
     PLATFORM: "linux-centos7"
-    TESTER: "liblinphone"  
+    TESTER: "liblinphone"
   only:
     variables:
       - $ENABLE_TESTS_LIBLINPHONE
